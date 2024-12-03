@@ -1,0 +1,166 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\geometry{a4paper, margin=1in}
+
+\title{P2: Mixture models: Genital warts}
+\author{Néstor Bravo Egea}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Modeling Genital Warts Incidence in Catalunya}
+
+To model the incidence of genital warts in Catalunya, we use a Gaussian Mixture Model (GMM), where the observed series \( Y_t \) represents registered incidence values. The model assumes that \( Y_t \) is a mixture of two normal distributions:
+
+\begin{itemize}
+    \item \( Y_{1t} \), a normal random variable with mean \( \mu \) and variance \( \sigma^2 \).
+    \item \( Y_{2t} \), a normal random variable with mean \( q \cdot \mu \) and variance \( q^2 \cdot \sigma^2 \).
+\end{itemize}
+
+The model for \( Y_t \) is given by:
+\[
+Y_t = \begin{cases} 
+      Y_{1t} & \text{with probability } (1 - \omega_t) \\
+      Y_{2t} & \text{with probability } \omega_t 
+   \end{cases}
+\]
+where \( \omega_t \) is a time-dependent probability of selecting \( Y_{2t} \).
+
+\subsection{Mixing Probability \( \omega_t \)}
+The mixing probability \( \omega_t \) is modeled as:
+\[
+\omega_t = \text{logit}^{-1}(\alpha_0 + \alpha_1 \cdot t)
+\]
+where \( \alpha_0 \) and \( \alpha_1 \) are parameters that allow \( \omega_t \) to vary over time.
+
+\subsection{Component Means}
+The means of the components are defined as follows:
+
+\paragraph{Mean of the First Component, \( \mu_{1,t} \):}
+The mean \( \mu_{1,t} \) is modeled as a function of time \( t \), age \( a \), sex \( s \), and their interaction:
+\[
+\mu_{1,t} = \beta_0 + \beta_1 \cdot t + \beta_2 \cdot a + \beta_3 \cdot s + \beta_4 \cdot (a \cdot s) + \beta_5 \cdot \sin\left(\frac{2 \pi t}{3}\right) + \beta_6 \cdot \cos\left(\frac{2 \pi t}{3}\right)
+\]
+where \( a \) represents age, \( s \) represents sex, and \( a \cdot s \) is the interaction between age and sex. The sinusoidal terms \( \sin\left(\frac{2 \pi t}{3}\right) \) and \( \cos\left(\frac{2 \pi t}{3}\right) \) capture seasonal effects.
+
+\paragraph{Mean of the Second Component, \( \mu_{2,t} \):}
+The mean \( \mu_{2,t} \) for the second component is scaled by \( q \) and has the same form as \( \mu_{1,t} \):
+\[
+\mu_{2,t} = q \cdot \left( \beta_0 + \beta_1 \cdot t + \beta_2 \cdot a + \beta_3 \cdot s + \beta_4 \cdot (a \cdot s) + \beta_5 \cdot \sin\left(\frac{2 \pi t}{3}\right) + \beta_6 \cdot \cos\left(\frac{2 \pi t}{3}\right) \right)
+\]
+
+\subsection{Interpretation and Application of the GMM}
+This GMM approach allows us to model two subpopulations within the incidence data, likely representing reported and underreported cases. By allowing \( \omega_t \), equation \ref{eq:omega}, to vary over time, the model captures the changing probability of belonging to either subpopulation. The sinusoidal terms enable us to capture seasonal variations in incidence rates. The value $q$, equation \ref{eq:q}, allows us to model the second component as a scaled version of the first component. In this model we consider this value to be constant.
+\begin{equation}\label{eq:omega}
+    \omega_t = \frac{e^{\alpha_0 + \alpha_1 \cdot t}}{1 + e^{\alpha_0 + \alpha_1 \cdot t}}
+\end{equation}
+
+\begin{equation}\label{eq:q}
+    q = \frac{e^{\gamma}}{1 + e^{\gamma}}
+\end{equation}
+The estimation of this values is done by maximizing the log-likelihood equation \ref{eq:loglike}.
+\begin{equation}
+    \log L = \sum_{t=1}^{T} \log \left( (1 - \omega_t) \cdot \frac{1}{\sqrt{2 \pi \sigma^2}} \exp\left(-\frac{(Y_t - \mu_{1,t})^2}{2 \sigma^2}\right) + \omega_t \cdot \frac{1}{\sqrt{2 \pi q^2 \sigma^2}} \exp\left(-\frac{(Y_t - \mu_{2,t})^2}{2 q^2 \sigma^2}\right) \right)
+    \label{eq:loglike}
+\end{equation}
+Where \( T \) is the number of observations, \( Y_t \) is the observed incidence at time \( t \), \( \mu_{1,t} \) and \( \mu_{2,t} \) are the means of the first and second components at time \( t \), \( \sigma^2 \) is the variance of the first component, and \( q^2 \sigma^2 \) is the variance of the second component. The parameters $\theta$ are the set of parameters that we want to estimate, in this case $\theta = \{\alpha_0, \alpha_1, \beta_0, \beta_1, \beta_2, \beta_3, \beta_4, \beta_5, \beta_6, \sigma, \delta\}$.
+\section{Implementation of the GMM in R}
+The GMM is implemented in R. The pseudoalgorithm can be seen in \ref{al:1}.
+\\\\
+Key points of it are the estimation of the initial parameters, which will be used to initialize the optimization process, and the estimation of the weights and the mean effect for each time point. Finaly, the algorithm reconstructs the incidence data using the posterior probabilities and the estimated value of $q$. So it is possible to compare the reconstructed data with the observed data and check how the underreported cases of genital warts are distributed over time and demographic groups.
+\begin{algorithm}
+    \label{al:1}
+    \caption{Analysis of Incidence Data using a Mixture Model Approach}
+    \begin{algorithmic}[1]
+    \STATE {Initialize:} Define covariates
+    \[
+    \text{covars} \gets \{t, \text{age}, \text{gender}, \text{age-gender}, \sin(2\pi t / 3), \cos(2\pi t / 3)\}.
+    \]
+    \STATE {Estimate Initial Parameters:}
+    \STATE Initialize weights $w_0 \gets 0.7$, $q_0 \gets 0.5$.
+    \STATE Perform regression-based mixture model estimation:
+    \[
+    \text{prova} \gets \text{regmixEM}(\text{incidence}, \text{covars}, w_0, q_0, \text{initial coefficients}).
+    \]
+    \STATE {Fit Model:}
+    \[
+    \text{linmod} \gets \text{lm}(\text{incidence} \sim \text{covars}).
+    \]
+    \STATE {Maximum Likelihood Estimation:}
+    \[
+    \text{max.llh} \gets \text{nlm}(\text{log-likelihood function}, \text{prova parameters}, \text{covars}).
+    \]
+    \STATE Compute $q$:
+    \[
+    q \gets \frac{\exp(\text{max.llh.estimate}[11])}{1 + \exp(\text{max.llh.estimate}[11])}.
+    \]
+    \STATE {Estimate Incidence per Time Point:}
+    \FOR{$i \in \text{sample size}$}
+        \STATE Compute weight:
+        \[
+        w[i] \gets \frac{\exp(a + b \cdot t[i])}{1 + \exp(a + b \cdot t[i])}.
+        \]
+        \STATE Compute mean effect:
+        \[
+        m \gets \sum (\text{covariate weights} \cdot \text{covars}[i]).
+        \]
+        \STATE Estimate incidence:
+        \[
+        y_\text{est}[i] \gets w[i] \cdot m + (1 - w[i]) \cdot \frac{m}{q}.
+        \]
+    \ENDFOR
+    \STATE {Posterior Probabilities:} Compute posterior probabilities for each demographic group.
+    \STATE {Reconstruct incidence data:} Reconstruct incidence data using posterior probabilities and estimated $q$.
+    \STATE Calculate reconstruction error.
+    \STATE {Plot Results}
+    \end{algorithmic}
+\end{algorithm}
+\newpage
+\section{Results}
+After executing the code, the results from the REFERENCIA\_PAPER had been replicated. The estimated values for the parameters are shown in Table \ref{tab:1}.
+\begin{table}[h!]
+    \centering
+    \caption{Parameter estimates \label{tab:1}}
+    \begin{tabular}{lll}
+    \hline
+    \textbf{Covariate} & \textbf{Parameter} & \textbf{Estimate (95\% CI)} \\
+    \hline
+     & $\alpha_0$ & 2.99 (1.77; 4.20) \\
+        $t$ & $\alpha_1$ & -4.31 (-6.53; -2.09) \\
+        & $\beta_0$ & 13.76 (7.11; 20.40) \\
+        $t$ & $\beta_1$ & 0.36 (-12.75; 13.46) \\
+        $age$ & $\beta_2$ & -13.53 (-14.13; -12.92) \\
+        $sex$ & $\beta_3$ & -1.60 (-2.24; -0.95) \\
+        $age \ast sex$ & $\beta_4$ & 3.25 (2.44; 4.06) \\
+         & $\beta_5$ & 4.16 (0.44; 7.88) \\
+         & $\beta_6$ & 0.52 (-5.59; 6.64) \\
+         & $q$ & 0.75 (0.72; 0.77) \\
+    \hline
+    \end{tabular}
+\end{table}
+The reconstructed data is shown in Figure \ref{fig:1}.
+
+\section{Discussion}
+This chapter discusses the implications of your results.
+
+\section{Conclusion}
+This chapter concludes your report and suggests possible future work.
+
+\appendix
+\section{Appendix}
+This is an appendix where you can include additional material.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
