@@ -3,10 +3,10 @@ library(ggplot2)
 library(gridExtra)
 
 # Load custom negative log-likelihood function
-source("llh_covars.R")
+source("R/llh_covars.R")
 
 # Load main data
-# load("data_main.RData")
+load("R/data_main.RData")
 # load("Data/max_llh.RData")
 
 # Covariates matrix (Time, Age, Gender, Interaction, Sine, Cosine)
@@ -57,27 +57,65 @@ calc_posterior <- function(incid, cov_effects, weight, covariates) {
   return(posterior_prob)
 }
 
-posterior_probabilities <- function(data, covariates) {
-  w <- numeric(nrow(data))
-  post <- matrix(0, nrow=nrow(data), ncol=2)
+posterior_probabilities <- function(data, covariates, max_llh, q) {
+  # Initialize matrices
+  n <- 96
+  post <- matrix(nrow = n, ncol = 2)
+  w <- vector()
   
-  for (i in 1:nrow(data)) {
-    cov_effects <- max.llh$estimate[1:10] * covariates[i, ]
-    w[i] <- exp(cov_effects[1] + cov_effects[2] * i / 96) / 
-            (1 + exp(cov_effects[1] + cov_effects[2] * i / 96))
-    post[i, 1] <- calc_posterior(data$incid[i], cov_effects, w[i], covariates[i, ])
-    post[i, 2] <- 1 - post[i, 1]
+  # Loop to calculate posterior probabilities
+  for (i in 1:n) {
+    # Calculate weight
+    w[i] <- exp(max_llh$estimate[1] + max_llh$estimate[2] * i / n) /
+      (1 + exp(max_llh$estimate[1] + max_llh$estimate[2] * i / n))
+    
+    # Calculate mean and standard deviation
+    mean_val <- max_llh$estimate[3] + 
+      max_llh$estimate[4] * i / n + 
+      max_llh$estimate[5] + 
+      max_llh$estimate[6] + 
+      max_llh$estimate[7] + 
+      max_llh$estimate[8] * covariates[i, 5] + 
+      max_llh$estimate[9] * covariates[i, 6]
+    
+    sd_val <- max_llh$estimate[10]
+    
+    # Calculate posterior probabilities
+    numerator1 <- w[i] * dnorm(data$incid[i], mean = mean_val, sd = sd_val)
+    numerator2 <- (1 - w[i]) * dnorm(data$incid[i], mean = mean_val / q, sd = sd_val / q)
+    denominator <- numerator1 + numerator2
+    
+    post[i, 1] <- numerator1 / denominator
+    post[i, 2] <- numerator2 / denominator
   }
+  
   return(post)
+}
+
+reconstruct_incid <- function(incid, post, q) {
+    xrec <- numeric(length(incid))
+  for (i in 1:length(incid)) {
+    xrec[i] <- ifelse(post[i, 2] > 0.5, incid[i], incid[i] / q)
+  }
+  return(xrec)
+}
+
+plot_time_series <- function(incid, xrec, start_year, end_year, ylim_range, main_title) {
+  ts.plot(ts(incid, start=c(start_year, 1), end=c(end_year, 12), freq=12), ylim=ylim_range, ylab="Incidence x 100,000", main=main_title)
+  lines(seq(start_year, end_year + 0.99, 1/12), xrec, col="red", lty=2)
+  legend("topright", legend=c("Observed", "Reconstructed"), col=c("black", "red"), lty=c(1, 2))
 }
 
 # Main demographic analysis
 process_demographic_group <- function(data, covariates, q_value, start_year, end_year, ylim_range, main_title) {
-  post <- posterior_probabilities(data, covariates)
+  post <- posterior_probabilities(data, covariates, max.llh, q_value)
+  print(post)
   xrec <- reconstruct_incid(data$incid, post, q_value)
-  calc_reconstruction_error(data$incid, xrec)
+  print(xrec)
   plot_time_series(data$incid, xrec, start_year, end_year, ylim_range, main_title)
 }
+
+
 
 process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 0, ], covars, q, 2009, 2016, c(9, 32), "Women 15-29 years old")
 process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 1, ], covars, q, 2009, 2016, c(1, 8), "Women 30-94 years old")
