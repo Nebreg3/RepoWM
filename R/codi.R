@@ -9,7 +9,7 @@ source("R/llh_covars.R")
 load("R/data_main.RData")
 # load("Data/max_llh.RData")
 
-# Covariates matrix (Time, Age, Gender, Interaction, Sine, Cosine)
+# Covariates matrix (Time, Age, Sex, Interaction, Sine, Cosine)
 t <- rep(seq(1, 96), 4) / 96
 pr3$interaction <- as.numeric(pr3$age) * as.numeric(pr3$sexe)
 covars <- cbind(t, pr3$age, pr3$sexe, pr3$interaction, sin(2 * pi * t / 3), cos(2 * pi * t / 3))
@@ -26,10 +26,20 @@ prova <- regmixEM(pr3$incid, covars, lambda=c(w0, 1 - w0),
 linmod <- lm(pr3$incid ~ covars[, 1:6])
 
 # Maximum likelihood estimation for `w` and `q`
-max.llh <- nlm(f=llh, p=c(log(prova$lambda[1] / (1 - prova$lambda[1])), 
-                          -0.5, linmod$coefficients, prova$sigma[1], 
-                          log((prova$beta[1,1] / prova$beta[1,2]) / (1 - prova$beta[1,1] / prova$beta[1,2]))), 
-              data=pr3$incid, covars=covars, hessian=TRUE)
+# Perform nonlinear minimization of the llh function
+max.llh <- nlm(
+  f = llh, 
+  p = c(
+    log(prova$lambda[1] / (1 - prova$lambda[1])),  # Logit transformation of prova$lambda[1]
+    -0.5,  # Fixed initial value
+    linmod$coefficients,  # Coefficients from the linear model
+    prova$sigma[1],  # First element of prova$sigma
+    log((prova$beta[1,1] / prova$beta[1,2]) / (1 - prova$beta[1,1] / prova$beta[1,2]))  # Logit transformation of the ratio of prova$beta
+  ), 
+  data = pr3$incid,  # Data for the llh function
+  covars = covars,  # Covariates for the llh function
+  hessian = TRUE  # Request Hessian matrix
+)
 q <- exp(max.llh$estimate[11]) / (1 + exp(max.llh$estimate[11]))
 
 # Estimate `y` with `w`, covariate weights, and transformations
