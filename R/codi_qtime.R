@@ -3,7 +3,7 @@ library(ggplot2)
 library(gridExtra)
 
 # Load custom negative log-likelihood function
-source("R/llh_covars.R")
+source("R/llh_covars_qtime.R")
 
 # Load main data
 load("R/data_main.RData")
