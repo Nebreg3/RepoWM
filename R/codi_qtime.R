@@ -117,15 +117,20 @@ posterior_probabilities <- function(data, covariates, max_llh) {
 reconstruct_incid <- function(incid, post, q_time_func) {
   xrec <- numeric(length(incid))
   for (i in 1:length(incid)) {
-    time <- i / length(incid)  # Compute time as a fraction of the index
-    q_t <- q_time_func(time)  # Call the dynamic q function
+    time <- i / length(incid)  
+    q_t <- q_time_func(time)  
     xrec[i] <- ifelse(post[i, 2] > 0.5, incid[i], incid[i] / q_t)
   }
   return(xrec)
 }
 
+plot_time_series <- function(incid, xrec, start_year, end_year, ylim_range, main_title) {
+  ts.plot(ts(incid, start=c(start_year, 1), end=c(end_year, 12), freq=12), ylim=ylim_range, ylab="Incidence x 100,000", main=main_title)
+  lines(seq(start_year, end_year + 0.99, 1/12), xrec, col="red", lty=2)
+  legend("topright", legend=c("Observed", "Reconstructed"), col=c("black", "red"), lty=c(1, 2))
+}
 
-# Main demographic analysis
+
 process_demographic_group <- function(data, covariates, start_year, end_year, ylim_range, main_title) {
   cat("Processing demographic group\n")
   post <- posterior_probabilities(data, covariates, max.llh)
