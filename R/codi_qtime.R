@@ -65,7 +65,7 @@ for (i in 1:384) {
 # Function definitions
 calc_posterior <- function(incid, cov_effects, weight, covariates, time) {
   q_t <- q_time(time)
-  
+  print(q_t)
   mean_group1 <- cov_effects[3] + sum(cov_effects[4:9] * covariates[1:6])
   mean_group2 <- mean_group1 / q_t
   sd_group1 <- max.llh$estimate[10]
@@ -90,15 +90,16 @@ posterior_probabilities <- function(data, covariates, max_llh) {
     w[i] <- exp(max_llh$estimate[1] + max_llh$estimate[2] * time) / 
             (1 + exp(max_llh$estimate[1] + max_llh$estimate[2] * time))
     q_t <- q_time(time)
+    # print(q_t)
     
     # Calculate mean and standard deviation
     mean_val <- max.llh$estimate[3] + 
       max.llh$estimate[4] * time + 
-      max.llh$estimate[5] + 
-      max.llh$estimate[6] + 
-      max.llh$estimate[7] + 
-      max.llh$estimate[8] * covariates[i, 5] + 
-      max.llh$estimate[9] * covariates[i, 6]
+      max_llh$estimate[5] * covariates[i, 2] + 
+      max_llh$estimate[6] * covariates[i, 3] + 
+      max_llh$estimate[7] * covariates[i, 4] +
+      max_llh$estimate[8] * covariates[i, 5] + 
+      max_llh$estimate[9] * covariates[i, 6]
     
     sd_val <- max.llh$estimate[10]
     
@@ -106,7 +107,10 @@ posterior_probabilities <- function(data, covariates, max_llh) {
     numerator1 <- w[i] * dnorm(data$incid[i], mean = mean_val, sd = sd_val)
     numerator2 <- (1 - w[i]) * dnorm(data$incid[i], mean = mean_val / q_t, sd = sd_val / q_t)
     denominator <- numerator1 + numerator2
-    
+    print(data$incid[i])
+    print(mean_val/q_t)
+    print(sd_val/q_t)
+    cat("\n\n")
     post[i, 1] <- numerator1 / denominator
     post[i, 2] <- numerator2 / denominator
   }
@@ -134,16 +138,25 @@ plot_time_series <- function(incid, xrec, start_year, end_year, ylim_range, main
 process_demographic_group <- function(data, covariates, start_year, end_year, ylim_range, main_title) {
   cat("Processing demographic group\n")
   post <- posterior_probabilities(data, covariates, max.llh)
+  # print(post)
   cat("Posterior probabilities calculated\n")
   xrec <- reconstruct_incid(data$incid, post, q_time)
+  # print(xrec)
   cat("Incidence reconstructed\n")
   plot_time_series(data$incid, xrec, start_year, end_year, ylim_range, main_title)
   cat("Time series plotted\n")
+  
+  # Load the paper result
+  file_name <- gsub(" ", "-", main_title)
+  xrec_paper <- readRDS(paste0("R/data/", file_name, ".RDS"))
+
+  # Plot the percentage difference
+  percentage_diff <- (xrec_paper - xrec) / xrec_paper * 100
+  p <- ts.plot(ts(percentage_diff, start = c(start_year, 1), end = c(end_year, 12), freq = 12), ylim = c(-5, 5), ylab = "Percentage Difference", main = paste0("Percentage Difference: ", main_title))
 }
 
-process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 0, ], covars, 2009, 2016, c(9, 32), "Women 15-29 years old")
-process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 1, ], covars, 2009, 2016, c(1, 8), "Women 30-94 years old")
-process_demographic_group(pr3[pr3$sexe == 1 & pr3$age == 0, ], covars, 2009, 2016, c(4, 32), "Men 15-29 years old")
-process_demographic_group(pr3[pr3$sexe == 1 & pr3$age == 1, ], covars, 2009, 2016, c(1, 12), "Men 30-94 years old")
 
-print("Done")
+process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 0, ], covars[covars[, 2] == 0 & covars[, 3] == 0, ], 2009, 2016, c(9, 32), "Women 15-29 years old")
+process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 1, ], covars[covars[, 2] == 1 & covars[, 3] == 0, ], 2009, 2016, c(1, 8), "Women 30-94 years old")
+process_demographic_group(pr3[pr3$sexe == 1 & pr3$age == 0, ], covars[covars[, 2] == 0 & covars[, 3] == 1, ], 2009, 2016, c(4, 32), "Men 15-29 years old")
+process_demographic_group(pr3[pr3$sexe == 1 & pr3$age == 1, ], covars[covars[, 2] == 1 & covars[, 3] == 1, ], 2009, 2016, c(1, 12), "Men 30-94 years old")

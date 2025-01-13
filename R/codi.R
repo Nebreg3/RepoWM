@@ -78,16 +78,14 @@ posterior_probabilities <- function(data, covariates, max_llh, q) {
     # Calculate weight
     w[i] <- exp(max_llh$estimate[1] + max_llh$estimate[2] * i / n) /
       (1 + exp(max_llh$estimate[1] + max_llh$estimate[2] * i / n))
-    
     # Calculate mean and standard deviation
     mean_val <- max_llh$estimate[3] + 
       max_llh$estimate[4] * i / n + 
-      max_llh$estimate[5] + 
-      max_llh$estimate[6] + 
-      max_llh$estimate[7] + 
+      max_llh$estimate[5] * covariates[i, 2] + 
+      max_llh$estimate[6] * covariates[i, 3] + 
+      max_llh$estimate[7] * covariates[i, 4] +
       max_llh$estimate[8] * covariates[i, 5] + 
       max_llh$estimate[9] * covariates[i, 6]
-    
     sd_val <- max_llh$estimate[10]
     
     # Calculate posterior probabilities
@@ -119,17 +117,19 @@ plot_time_series <- function(incid, xrec, start_year, end_year, ylim_range, main
 # Main demographic analysis
 process_demographic_group <- function(data, covariates, q_value, start_year, end_year, ylim_range, main_title) {
   post <- posterior_probabilities(data, covariates, max.llh, q_value)
-  print(post)
+  # print(post)
   xrec <- reconstruct_incid(data$incid, post, q_value)
-  print(xrec)
+  # Ensure the directory exists
+  dir.create("R/data", showWarnings = FALSE, recursive = TRUE)
+  
+  file_name <- gsub(" ", "-", main_title)
+  saveRDS(xrec, paste0("R/data/", file_name, ".RDS"))  # print(xrec)
   plot_time_series(data$incid, xrec, start_year, end_year, ylim_range, main_title)
 }
 
 
 
-process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 0, ], covars, q, 2009, 2016, c(9, 32), "Women 15-29 years old")
-process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 1, ], covars, q, 2009, 2016, c(1, 8), "Women 30-94 years old")
-process_demographic_group(pr3[pr3$sexe == 1 & pr3$age == 0, ], covars, q, 2009, 2016, c(4, 32), "Men 15-29 years old")
-process_demographic_group(pr3[pr3$sexe == 1 & pr3$age == 1, ], covars, q, 2009, 2016, c(1, 12), "Men 30-94 years old")
-
-print("Done")
+process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 0, ], covars[covars[, 2] == 0 & covars[, 3] == 0, ], q, 2009, 2016, c(9, 32), "Women 15-29 years old")
+process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 1, ], covars[covars[, 2] == 1 & covars[, 3] == 0, ], q, 2009, 2016, c(1, 8), "Women 30-94 years old")
+process_demographic_group(pr3[pr3$sexe == 1 & pr3$age == 0, ], covars[covars[, 2] == 0 & covars[, 3] == 1, ], q, 2009, 2016, c(4, 32), "Men 15-29 years old")
+process_demographic_group(pr3[pr3$sexe == 1 & pr3$age == 1, ], covars[covars[, 2] == 1 & covars[, 3] == 1, ], q, 2009, 2016, c(1, 12), "Men 30-94 years old")
