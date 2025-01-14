@@ -55,7 +55,12 @@ for (i in 1:384) {
   y_est[i] <- w[i] * m + (1 - w[i]) * m / q
 }
 
-# Function definitions (unchanged unless stated)
+# Calculate posterior probabilities for a given incidence and covariate effects
+#' @param incid Numeric value representing the incidence.
+#' @param cov_effects Numeric vector of coefficients for covariates.
+#' @param weight Numeric value representing the weight of the first group.
+#' @param covariates Numeric vector of covariates for the individual.
+#' @return Numeric value of the posterior probability for the first group.
 calc_posterior <- function(incid, cov_effects, weight, covariates) {
   mean_group1 <- cov_effects[3] + sum(cov_effects[4:9] * covariates[1:6])
   mean_group2 <- mean_group1 / q
@@ -67,18 +72,20 @@ calc_posterior <- function(incid, cov_effects, weight, covariates) {
   return(posterior_prob)
 }
 
+# Calculate posterior probabilities for all data points in a dataset
+#' @param data Data frame containing the incidence values.
+#' @param covariates Matrix of covariates for the dataset.
+#' @param max_llh A list containing the maximum likelihood estimates for the parameters.
+#' @param q Numeric value representing the underreporting factor.
+#' @return Matrix of posterior probabilities for both groups (group 1 and group 2).
 posterior_probabilities <- function(data, covariates, max_llh, q) {
-  # Initialize matrices
   n <- 96
   post <- matrix(nrow = n, ncol = 2)
   w <- vector()
   
-  # Loop to calculate posterior probabilities
   for (i in 1:n) {
-    # Calculate weight
     w[i] <- exp(max_llh$estimate[1] + max_llh$estimate[2] * i / n) /
       (1 + exp(max_llh$estimate[1] + max_llh$estimate[2] * i / n))
-    # Calculate mean and standard deviation
     mean_val <- max_llh$estimate[3] + 
       max_llh$estimate[4] * i / n + 
       max_llh$estimate[5] * covariates[i, 2] + 
@@ -88,7 +95,6 @@ posterior_probabilities <- function(data, covariates, max_llh, q) {
       max_llh$estimate[9] * covariates[i, 6]
     sd_val <- max_llh$estimate[10]
     
-    # Calculate posterior probabilities
     numerator1 <- w[i] * dnorm(data$incid[i], mean = mean_val, sd = sd_val)
     numerator2 <- (1 - w[i]) * dnorm(data$incid[i], mean = mean_val / q, sd = sd_val / q)
     denominator <- numerator1 + numerator2
@@ -100,30 +106,48 @@ posterior_probabilities <- function(data, covariates, max_llh, q) {
   return(post)
 }
 
+# Reconstruct incidences based on posterior probabilities
+#' @param incid Numeric vector of observed incidence values.
+#' @param post Matrix of posterior probabilities.
+#' @param q Numeric value representing the underreporting factor.
+#' @return Numeric vector of reconstructed incidences.
 reconstruct_incid <- function(incid, post, q) {
-    xrec <- numeric(length(incid))
+  xrec <- numeric(length(incid))
   for (i in 1:length(incid)) {
     xrec[i] <- ifelse(post[i, 2] > 0.5, incid[i], incid[i] / q)
   }
   return(xrec)
 }
 
+# Plot time series of observed and reconstructed incidences
+#' @param incid Numeric vector of observed incidence values.
+#' @param xrec Numeric vector of reconstructed incidences.
+#' @param start_year Integer representing the start year of the time series.
+#' @param end_year Integer representing the end year of the time series.
+#' @param ylim_range Numeric vector defining the y-axis range for the plot.
+#' @param main_title Character string representing the title of the plot.
 plot_time_series <- function(incid, xrec, start_year, end_year, ylim_range, main_title) {
   ts.plot(ts(incid, start=c(start_year, 1), end=c(end_year, 12), freq=12), ylim=ylim_range, ylab="Incidence x 100,000", main=main_title)
   lines(seq(start_year, end_year + 0.99, 1/12), xrec, col="red", lty=2)
   legend("topright", legend=c("Observed", "Reconstructed"), col=c("black", "red"), lty=c(1, 2))
 }
 
-# Main demographic analysis
+# Process and analyze incidence data for a specific demographic group
+#' @param data Data frame containing the demographic group's incidence data.
+#' @param covariates Matrix of covariates for the demographic group.
+#' @param q_value Numeric value representing the underreporting factor.
+#' @param start_year Integer representing the start year of the time series.
+#' @param end_year Integer representing the end year of the time series.
+#' @param ylim_range Numeric vector defining the y-axis range for the plot.
+#' @param main_title Character string representing the title of the plot and output file.
 process_demographic_group <- function(data, covariates, q_value, start_year, end_year, ylim_range, main_title) {
   post <- posterior_probabilities(data, covariates, max.llh, q_value)
-  # print(post)
   xrec <- reconstruct_incid(data$incid, post, q_value)
-  # Ensure the directory exists
+
   dir.create("R/data", showWarnings = FALSE, recursive = TRUE)
-  
   file_name <- gsub(" ", "-", main_title)
-  saveRDS(xrec, paste0("R/data/", file_name, ".RDS"))  # print(xrec)
+  saveRDS(xrec, paste0("R/data/", file_name, ".RDS"))
+
   plot_time_series(data$incid, xrec, start_year, end_year, ylim_range, main_title)
 }
 
