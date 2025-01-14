@@ -17,10 +17,10 @@ covars <- cbind(t, pr3$age, pr3$sexe, pr3$interaction, sin(2 * pi * t / 3), cos(
 # Initial values via mixtools (Direct estimation for MLE start)
 w0 <- 0.7
 q0 <- 0.5
-prova <- regmixEM(pr3$incid, covars, lambda=c(w0, 1 - w0), 
-                  beta=matrix(c(rep(mean(pr3$incid), 2), rep(0, 12)), ncol=2), 
-                  sigma=c(sd(pr3$incid), sd(pr3$incid) / q0), 
-                  k=2, addintercept=TRUE, epsilon=1e-16, maxit=10000)
+prova <- regmixEM(pr3$incid, covars, lambda = c(w0, 1 - w0), 
+          beta = matrix(c(rep(mean(pr3$incid), 2), rep(0, 12)), ncol = 2), 
+          sigma = c(sd(pr3$incid), sd(pr3$incid) / q0), 
+          k = 2, addintercept = TRUE, epsilon = 1e-16, maxit = 10000)
 
 # Linear regression for initial covariate values
 linmod <- lm(pr3$incid ~ covars[, 1:6])
@@ -30,12 +30,12 @@ linmod <- lm(pr3$incid ~ covars[, 1:6])
 max.llh <- nlm(
   f = llh, 
   p = c(
-    log(prova$lambda[1] / (1 - prova$lambda[1])),  # Logit transformation of prova$lambda[1]
-    -0.5,  # Fixed initial value for w slope
-    linmod$coefficients,  # Coefficients from the linear model
-    prova$sigma[1],  # First element of prova$sigma
-    0,  # Initial value for q intercept (gamma_0)
-    0   # Initial value for q slope (gamma_1)
+  log(prova$lambda[1] / (1 - prova$lambda[1])),  # Logit transformation of prova$lambda[1]
+  -0.5,  # Fixed initial value for w slope
+  linmod$coefficients,  # Coefficients from the linear model
+  prova$sigma[1],  # First element of prova$sigma
+  0,  # Initial value for q intercept (gamma_0)
+  0   # Initial value for q slope (gamma_1)
   ), 
   data = pr3$incid,  # Data for the llh function
   covars = covars,  # Covariates for the llh function
@@ -45,7 +45,7 @@ max.llh <- nlm(
 # Extract dynamic q as a function of time
 q_time <- function(j) {
   exp(max.llh$estimate[11] + max.llh$estimate[12] * j) /
-    (1 + exp(max.llh$estimate[11] + max.llh$estimate[12] * j))
+  (1 + exp(max.llh$estimate[11] + max.llh$estimate[12] * j))
 }
 
 # Estimate `y` with `w`, dynamic `q`, covariate weights, and transformations
@@ -55,7 +55,7 @@ w <- numeric(384)
 for (i in 1:384) {
   j <- ifelse((i %% 96) / 96 == 0, 1, (i %% 96) / 96)
   w[i] <- exp(max.llh$estimate[1] + max.llh$estimate[2] * j) / 
-          (1 + exp(max.llh$estimate[1] + max.llh$estimate[2] * j))
+      (1 + exp(max.llh$estimate[1] + max.llh$estimate[2] * j))
   q_t <- q_time(j)
   cov_weights <- max.llh$estimate[3:10]
   m <- sum(cov_weights * c(1, j, pr3$age[i], pr3$sexe[i], pr3$interaction[i], covars[i, 5:6]))
@@ -71,8 +71,8 @@ calc_posterior <- function(incid, cov_effects, weight, covariates, time) {
   sd_group1 <- max.llh$estimate[10]
   sd_group2 <- sd_group1 / q_t
   
-  prob_group1 <- weight * dnorm(incid, mean=mean_group1, sd=sd_group1)
-  prob_group2 <- (1 - weight) * dnorm(incid, mean=mean_group2, sd=sd_group2)
+  prob_group1 <- weight * dnorm(incid, mean = mean_group1, sd = sd_group1)
+  prob_group2 <- (1 - weight) * dnorm(incid, mean = mean_group2, sd = sd_group2)
   
   posterior_prob <- prob_group1 / (prob_group1 + prob_group2)
   return(posterior_prob)
@@ -86,33 +86,33 @@ posterior_probabilities <- function(data, covariates, max_llh) {
   
   # Loop to calculate posterior probabilities
   for (i in 1:n) {
-    time <- i / n
-    w[i] <- exp(max_llh$estimate[1] + max_llh$estimate[2] * time) / 
-            (1 + exp(max_llh$estimate[1] + max_llh$estimate[2] * time))
-    q_t <- q_time(time)
-    # print(q_t)
-    
-    # Calculate mean and standard deviation
-    mean_val <- max.llh$estimate[3] + 
-      max.llh$estimate[4] * time + 
-      max_llh$estimate[5] * covariates[i, 2] + 
-      max_llh$estimate[6] * covariates[i, 3] + 
-      max_llh$estimate[7] * covariates[i, 4] +
-      max_llh$estimate[8] * covariates[i, 5] + 
-      max_llh$estimate[9] * covariates[i, 6]
-    
-    sd_val <- max.llh$estimate[10]
-    
-    # Calculate posterior probabilities
-    numerator1 <- w[i] * dnorm(data$incid[i], mean = mean_val, sd = sd_val)
-    numerator2 <- (1 - w[i]) * dnorm(data$incid[i], mean = mean_val / q_t, sd = sd_val / q_t)
-    denominator <- numerator1 + numerator2
-    print(data$incid[i])
-    print(mean_val/q_t)
-    print(sd_val/q_t)
-    cat("\n\n")
-    post[i, 1] <- numerator1 / denominator
-    post[i, 2] <- numerator2 / denominator
+  time <- i / n
+  w[i] <- exp(max_llh$estimate[1] + max_llh$estimate[2] * time) / 
+      (1 + exp(max_llh$estimate[1] + max_llh$estimate[2] * time))
+  q_t <- q_time(time)
+  # print(q_t)
+  
+  # Calculate mean and standard deviation
+  mean_val <- max_llh$estimate[3] + 
+    max_llh$estimate[4] * time + 
+    max_llh$estimate[5] * covariates[i, 2] + 
+    max_llh$estimate[6] * covariates[i, 3] + 
+    max_llh$estimate[7] * covariates[i, 4] +
+    max_llh$estimate[8] * covariates[i, 5] + 
+    max_llh$estimate[9] * covariates[i, 6]
+  
+  sd_val <- max.llh$estimate[10]
+  
+  # Calculate posterior probabilities
+  numerator1 <- w[i] * dnorm(data$incid[i], mean = mean_val, sd = sd_val)
+  numerator2 <- (1 - w[i]) * dnorm(data$incid[i], mean = mean_val / q_t, sd = sd_val / q_t)
+  denominator <- numerator1 + numerator2
+  print(data$incid[i])
+  print(mean_val / q_t)
+  print(sd_val / q_t)
+  cat("\n\n")
+  post[i, 1] <- numerator1 / denominator
+  post[i, 2] <- numerator2 / denominator
   }
   
   return(post)
@@ -121,19 +121,18 @@ posterior_probabilities <- function(data, covariates, max_llh) {
 reconstruct_incid <- function(incid, post, q_time_func) {
   xrec <- numeric(length(incid))
   for (i in 1:length(incid)) {
-    time <- i / length(incid)  
-    q_t <- q_time_func(time)  
-    xrec[i] <- ifelse(post[i, 2] > 0.5, incid[i], incid[i] / q_t)
+  time <- i / length(incid)  
+  q_t <- q_time_func(time)  
+  xrec[i] <- ifelse(post[i, 2] > 0.5, incid[i], incid[i] / q_t)
   }
   return(xrec)
 }
 
 plot_time_series <- function(incid, xrec, start_year, end_year, ylim_range, main_title) {
-  ts.plot(ts(incid, start=c(start_year, 1), end=c(end_year, 12), freq=12), ylim=ylim_range, ylab="Incidence x 100,000", main=main_title)
-  lines(seq(start_year, end_year + 0.99, 1/12), xrec, col="red", lty=2)
-  legend("topright", legend=c("Observed", "Reconstructed"), col=c("black", "red"), lty=c(1, 2))
+  ts.plot(ts(incid, start = c(start_year, 1), end = c(end_year, 12), freq = 12), ylim = ylim_range, ylab = "Incidence x 100,000", main = main_title)
+  lines(seq(start_year, end_year + 0.99, 1 / 12), xrec, col = "red", lty = 2)
+  legend("topright", legend = c("Observed", "Reconstructed"), col = c("black", "red"), lty = c(1, 2))
 }
-
 
 process_demographic_group <- function(data, covariates, start_year, end_year, ylim_range, main_title) {
   cat("Processing demographic group\n")
@@ -154,7 +153,6 @@ process_demographic_group <- function(data, covariates, start_year, end_year, yl
   percentage_diff <- (xrec_paper - xrec) / xrec_paper * 100
   p <- ts.plot(ts(percentage_diff, start = c(start_year, 1), end = c(end_year, 12), freq = 12), ylim = c(-5, 5), ylab = "Percentage Difference", main = paste0("Percentage Difference: ", main_title))
 }
-
 
 process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 0, ], covars[covars[, 2] == 0 & covars[, 3] == 0, ], 2009, 2016, c(9, 32), "Women 15-29 years old")
 process_demographic_group(pr3[pr3$sexe == 0 & pr3$age == 1, ], covars[covars[, 2] == 1 & covars[, 3] == 0, ], 2009, 2016, c(1, 8), "Women 30-94 years old")
