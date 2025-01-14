@@ -155,7 +155,6 @@ plot_time_series <- function(incid, xrec, start_year, end_year, ylim_range, main
 # Process and analyze incidence data for a specific demographic group
 #' @param data Data frame containing the demographic group's incidence data.
 #' @param covariates Matrix of covariates for the demographic group.
-#' @param q_value Numeric value representing the underreporting factor.
 #' @param start_year Integer representing the start year of the time series.
 #' @param end_year Integer representing the end year of the time series.
 #' @param ylim_range Numeric vector defining the y-axis range for the plot.
@@ -163,10 +162,8 @@ plot_time_series <- function(incid, xrec, start_year, end_year, ylim_range, main
 process_demographic_group <- function(data, covariates, start_year, end_year, ylim_range, main_title) {
   cat("Processing demographic group\n")
   post <- posterior_probabilities(data, covariates, max.llh)
-  # print(post)
   cat("Posterior probabilities calculated\n")
   xrec <- reconstruct_incid(data$incid, post, q_time)
-  # print(xrec)
   cat("Incidence reconstructed\n")
   plot_time_series(data$incid, xrec, start_year, end_year, ylim_range, main_title)
   cat("Time series plotted\n")
