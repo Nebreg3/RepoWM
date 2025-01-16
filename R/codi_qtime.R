@@ -202,7 +202,7 @@ process_demographic_group <- function(data, covariates, start_year, end_year, yl
   return(p1)
 }
 
-
+#' Compute global residuals for the model
 #' @param max_llh A list containing the maximum likelihood estimates for the parameters.
 #' @param pr3 Data frame containing the incidence data.
 #' @param covars Matrix of covariates for the dataset.
